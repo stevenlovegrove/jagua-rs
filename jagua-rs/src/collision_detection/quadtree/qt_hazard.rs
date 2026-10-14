@@ -32,6 +32,7 @@ pub enum QTHazPresence {
 }
 impl<E: HazardEntity> QTHazard<E> {
     /// Converts a [`Hazard`] into a [`QTHazard`], assuming it is for the root of the quadtree.
+    /// The hazard may extend beyond the root, or lie entirely outside it.
     #[must_use]
     pub fn from_root(qt_root_bbox: Rect, haz: &Hazard<E>, hkey: HazKey) -> Self {
         Self {
@@ -116,7 +117,16 @@ impl<E: HazardEntity> QTHazard<E> {
                         });
                     }
 
-                    debug_assert!(constricted_hazards.iter().filter(|h| h.is_some()).count() > 0);
+                    // Every edge touching the node also touches one of its quadrants.
+                    // Only the root can hold a hazard with no edge touching it: one lying entirely outside or around the quadtree.
+                    // The containment checks below resolve those.
+                    debug_assert!(
+                        constricted_hazards.iter().any(Option::is_some)
+                            || !partial_haz
+                                .edges
+                                .iter()
+                                .any(|edge| self.qt_bbox.collides_with(edge))
+                    );
 
                     //At this point, we have resolved all quadrants that have edges colliding with them (i.e. `Partial` presence).
                     //What remain are the quadrants without any intersecting edges.
